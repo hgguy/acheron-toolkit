@@ -44,5 +44,5 @@ jobs:
       - name: Keep runner alive for session
         run: |
           Write-Host "Waiting 300s for meterpreter session..."
-          Start-Sleep -Seconds 300
+          Start-Sleep -Seconds 900
         shell: pwsh
