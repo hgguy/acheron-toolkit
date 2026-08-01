@@ -22,12 +22,12 @@ cp -r "$SCRIPT_DIR/templates" "$TOOLKIT_DIR/" 2>/dev/null || true
 # Make scripts executable
 chmod +x "$TOOLKIT_DIR"/*.sh
 
-# Create global command
-cat > "$BIN_DIR/acheron" << EOF
+# Create global command - use literal heredoc to avoid expansion at install time
+cat > "$BIN_DIR/acheron" << 'EOF'
 #!/bin/bash
 # Acheron Payload Toolkit launcher
 export ACHERON_TOOLKIT_DIR="${ACHERON_TOOLKIT_DIR:-$HOME/.local/share/acheron-toolkit}"
-exec "\$ACHERON_TOOLKIT_DIR/toolkit.sh" "\$@"
+exec "$ACHERON_TOOLKIT_DIR/toolkit.sh" "$@"
 EOF
 chmod +x "$BIN_DIR/acheron"
 
@@ -49,15 +49,21 @@ fi
 # Install Metasploit module (requires sudo)
 MODULE_SOURCE="$SCRIPT_DIR/bypassuac_method59.rb"
 MODULE_DEST="/usr/share/metasploit-framework/modules/post/windows/escalate/bypassuac_method59.rb"
-if [ -f "$MODULE_SOURCE" ]; then
-    echo "[*] Installing Metasploit module to $MODULE_DEST (requires sudo)"
-    if sudo cp "$MODULE_SOURCE" "$MODULE_DEST" && sudo chmod 644 "$MODULE_DEST"; then
-        echo "[+] Metasploit module installed"
-    else
-        echo "[!] Failed to install Metasploit module (run manually with sudo)"
-    fi
+
+# Check for sudo availability
+if ! command -v sudo >/dev/null 2>&1; then
+    echo "[!] sudo not available - skipping Metasploit module installation"
 else
-    echo "[!] Metasploit module not found at $MODULE_SOURCE"
+    if [ -f "$MODULE_SOURCE" ]; then
+        echo "[*] Installing Metasploit module to $MODULE_DEST (requires sudo)"
+        if sudo cp "$MODULE_SOURCE" "$MODULE_DEST" && sudo chmod 644 "$MODULE_DEST"; then
+            echo "[+] Metasploit module installed"
+        else
+            echo "[!] Failed to install Metasploit module (run manually with sudo)"
+        fi
+    else
+        echo "[!] Metasploit module not found at $MODULE_SOURCE"
+    fi
 fi
 
 echo "[+] Installed to $TOOLKIT_DIR"

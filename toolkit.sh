@@ -56,10 +56,7 @@ while true; do
             check_deps || { read -p $'\n[Enter]'; continue; }
             read -p $'\e[1;33m[IP]\e[0m LHOST: ' lhost
             read -p $'\e[1;33m[PORT]\e[0m LPORT: ' lport
-            echo -e "\e[1;34mTemplate:\e[0m\n 1) None\n 2) PDF\n 3) DOCX\n 4) JPG"
-            read -p $'\e[1;33m[?] \e[0mSelect: ' ptemplate
-            case $ptemplate in 1) pt="none" ;; 2) pt="pdf" ;; 3) pt="docx" ;; 4) pt="jpg" ;; *) pt="none" ;; esac
-            "$TOOLKIT_DIR/acherongen.sh" "$lhost" "$lport" "$pt"
+            "$TOOLKIT_DIR/acherongen.sh" "$lhost" "$lport"
             read -p $'\n[Enter]'
             ;;
         2)
