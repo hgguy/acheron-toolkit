@@ -1,0 +1,47 @@
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.o
+*.a
+*.lib
+
+# Go build artifacts
+*.mod
+*.sum
+go.mod
+go.sum
+vendor/
+
+# Go build output
+*.exe
+/tmp/go_build.log
+/tmp/go_get.log
+/tmp/build_exit_code
+
+# msfvenom output
+sc.hex
+*.rc
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*~
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Payload output
+acheron_*.exe
+
+# Go module cache (optional)
+# vendor/
