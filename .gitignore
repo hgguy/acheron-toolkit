@@ -45,3 +45,6 @@ acheron_*.exe
 
 # Go module cache (optional)
 # vendor/
+
+# Metasploit modules
+*.rbc
