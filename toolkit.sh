@@ -2,6 +2,9 @@
 # Acheron Payload Toolkit - Main TUI
 # Portable, no hardcoded paths
 
+# Version - FIX #2: Version consistency
+VERSION="v1.3"
+
 # Verbose ON by default, --quiet/-q to disable
 VERBOSE=true
 # Parse --quiet / -q to disable verbose
@@ -43,7 +46,7 @@ clear
 while true; do
     clear
     echo -e "\e[1;34m╔══════════════════════════════════════════════════╦\e[0m"
-    echo -e "\e[1;34m║        \e[1;37mAcheron Payload Toolkit v1.0\e[1;34m         ║\e[0m"
+    echo -e "\e[1;34m║        \e[1;37mAcheron Payload Toolkit $VERSION\e[1;34m        ║\e[0m"
     echo -e "\e[1;34m╠══════════════════════════════════════════════════╣\e[0m"
     echo -e "\e[1;34m║  \e[1;32m1\e[0m) Generate Reverse Shell (Acheron)      ║\e[0m"
     echo -e "\e[1;34m║  \e[1;32m2\e[0m) Start Listener (msfconsole)            ║\e[0m"
@@ -56,6 +59,7 @@ while true; do
             check_deps || { read -p $'\n[Enter]'; continue; }
             read -p $'\e[1;33m[IP]\e[0m LHOST: ' lhost
             read -p $'\e[1;33m[PORT]\e[0m LPORT: ' lport
+            # FIX #2: Removed TEMPLATE option - not implemented
             "$TOOLKIT_DIR/acherongen.sh" "$lhost" "$lport"
             read -p $'\n[Enter]'
             ;;

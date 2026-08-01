@@ -12,6 +12,7 @@ echo "[*] Installing Acheron Toolkit to $TOOLKIT_DIR"
 
 mkdir -p "$TOOLKIT_DIR"
 mkdir -p "$BIN_DIR"
+mkdir -p "$TOOLKIT_DIR/bin"
 
 # Copy only necessary files (not hidden, not build artifacts)
 cp "$SCRIPT_DIR/toolkit.sh" "$TOOLKIT_DIR/"
@@ -46,24 +47,22 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
     fi
 fi
 
-# Install Metasploit module (requires sudo)
+# Install Metasploit module to USER directory (not system) - FIX #12
 MODULE_SOURCE="$SCRIPT_DIR/bypassuac_method59.rb"
-MODULE_DEST="/usr/share/metasploit-framework/modules/post/windows/escalate/bypassuac_method59.rb"
+MODULE_DEST="$HOME/.msf4/modules/post/windows/escalate/bypassuac_method59.rb"
 
-# Check for sudo availability
-if ! command -v sudo >/dev/null 2>&1; then
-    echo "[!] sudo not available - skipping Metasploit module installation"
-else
-    if [ -f "$MODULE_SOURCE" ]; then
-        echo "[*] Installing Metasploit module to $MODULE_DEST (requires sudo)"
-        if sudo cp "$MODULE_SOURCE" "$MODULE_DEST" && sudo chmod 644 "$MODULE_DEST"; then
-            echo "[+] Metasploit module installed"
-        else
-            echo "[!] Failed to install Metasploit module (run manually with sudo)"
-        fi
+mkdir -p "$(dirname "$MODULE_DEST")"
+
+if [ -f "$MODULE_SOURCE" ]; then
+    echo "[*] Installing Metasploit module to $MODULE_DEST"
+    if cp "$MODULE_SOURCE" "$MODULE_DEST" && chmod 644 "$MODULE_DEST"; then
+        echo "[+] Metasploit module installed to user directory"
+        echo "[*] Run 'reload_all' in msfconsole"
     else
-        echo "[!] Metasploit module not found at $MODULE_SOURCE"
+        echo "[!] Failed to install Metasploit module"
     fi
+else
+    echo "[!] Metasploit module not found at $MODULE_SOURCE"
 fi
 
 echo "[+] Installed to $TOOLKIT_DIR"
@@ -71,3 +70,4 @@ echo "[*] Global command: acheron (run 'source ~/.bashrc' or restart shell)"
 echo "[*] Override install dir: export ACHERON_TOOLKIT_DIR=/custom/path"
 echo "[*] Override bin dir: export ACHERON_BIN_DIR=/custom/bin"
 echo "[*] Akagi binary: place at \$ACHERON_TOOLKIT_DIR/bin/akagi.exe or set AKAGI_PATH"
+echo "[*] Metasploit module: ~/.msf4/modules/post/windows/escalate/bypassuac_method59.rb"

