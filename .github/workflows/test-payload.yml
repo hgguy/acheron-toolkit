@@ -6,24 +6,11 @@ on:
 jobs:
   execute-payload:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
-      - name: Install mingw-w64 for cross-compilation
-        run: |
-          choco install mingw -y
-          refreshenv
-        shell: pwsh
-      
-      - name: Cross-compile uacbypass.exe
-        run: |
-          cd $GITHUB_WORKSPACE
-          x86_64-w64-mingw32-gcc uacbypass.c -o uacbypass.exe -static
-          dir uacbypass.exe
-        shell: pwsh
       
       - name: Verify payload exists
         run: |
