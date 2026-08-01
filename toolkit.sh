@@ -29,7 +29,7 @@ run() {
     else
         "$@" 2>&1
     fi
-done
+}
 
 check_deps() {
     local ok=true
@@ -59,14 +59,14 @@ while true; do
             echo -e "\e[1;34mTemplate:\e[0m\n 1) None\n 2) PDF\n 3) DOCX\n 4) JPG"
             read -p $'\e[1;33m[?] \e[0mSelect: ' ptemplate
             case $ptemplate in 1) pt="none" ;; 2) pt="pdf" ;; 3) pt="docx" ;; 4) pt="jpg" ;; *) pt="none" ;; esac
-            "$ACHERON_TOOLKIT_DIR/acherongen.sh" "$lhost" "$lport" "$pt"
+            "$TOOLKIT_DIR/acherongen.sh" "$lhost" "$lport" "$pt"
             read -p $'\n[Enter]'
             ;;
         2)
             check_deps || { read -p $'\n[Enter]'; continue; }
             read -p $'\e[1;33m[LHOST]\e[0m LHOST: ' lhost
             read -p $'\e[1;33m[PORT]\e[0m LPORT: ' lport
-            listener_file=$("$ACHERON_TOOLKIT_DIR/listener_gen.sh" "$lport" "$lhost")
+            listener_file=$("$TOOLKIT_DIR/listener_gen.sh" "$lport" "$lhost")
             echo "[*] Listener generato: $listener_file"
             read -p $'\e[1;33m[?] \e[0mLanciare msfconsole ora? (y/n): ' launch
             if [ "$launch" = "y" ] || [ "$launch" = "Y" ]; then

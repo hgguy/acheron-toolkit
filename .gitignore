@@ -45,6 +45,7 @@ acheron_*.exe
 
 # Akagi binary (user provided, not in repo)
 akagi.exe
+bin/akagi.exe
 
 # Metasploit modules
 *.rbc

