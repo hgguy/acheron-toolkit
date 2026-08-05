@@ -53,27 +53,27 @@ while true; do
     echo -e "\e[1;34m║  \e[1;32m3\e[0m) Check Dependencies                      ║\e[0m"
     echo -e "\e[1;34m║  \e[1;32m0\e[0m) Exit                                    ║\e[0m"
     echo -e "\e[1;34m╚═══════════════════════════════════════════════════╝\e[0m"
-    read -p $'\e[1;33m[?] \e[0mSelect: ' choice
+    read -r -p $'\e[1;33m[?] \e[0mSelect: ' choice
     case $choice in
         1)
-            check_deps || { read -p $'\n[Enter]'; continue; }
-            read -p $'\e[1;33m[IP]\e[0m LHOST: ' lhost
-            read -p $'\e[1;33m[PORT]\e[0m LPORT: ' lport
+            check_deps || { read -r -p $'\n[Enter]'; continue; }
+            read -r -p $'\e[1;33m[IP]\e[0m LHOST: ' lhost
+            read -r -p $'\e[1;33m[PORT]\e[0m LPORT: ' lport
             # FIX #2: Removed TEMPLATE option - not implemented
             "$TOOLKIT_DIR/acherongen.sh" "$lhost" "$lport"
-            read -p $'\n[Enter]'
+            read -r -p $'\n[Enter]'
             ;;
         2)
-            check_deps || { read -p $'\n[Enter]'; continue; }
-            read -p $'\e[1;33m[LHOST]\e[0m LHOST: ' lhost
-            read -p $'\e[1;33m[PORT]\e[0m LPORT: ' lport
+            check_deps || { read -r -p $'\n[Enter]'; continue; }
+            read -r -p $'\e[1;33m[LHOST]\e[0m LHOST: ' lhost
+            read -r -p $'\e[1;33m[PORT]\e[0m LPORT: ' lport
             listener_file=$("$TOOLKIT_DIR/listener_gen.sh" "$lport" "$lhost")
             echo "[*] Listener generato: $listener_file"
-            read -p $'\e[1;33m[?] \e[0mLanciare msfconsole ora? (y/n): ' launch
+            read -r -p $'\e[1;33m[?] \e[0mLanciare msfconsole ora? (y/n): ' launch
             if [ "$launch" = "y" ] || [ "$launch" = "Y" ]; then
                 msfconsole -r "$listener_file"
             fi
-            read -p $'\n[Enter]'
+            read -r -p $'\n[Enter]'
             ;;
         3)
             info "Checking dependencies..."
@@ -81,7 +81,7 @@ while true; do
             command -v go && echo "  go: OK" || echo "  go: MISSING"
             command -v msfconsole && echo "  msfconsole: OK" || echo "  msfconsole: MISSING"
             go list -m github.com/f1zm0/acheron 2>/dev/null && echo "  acheron: OK" || echo "  acheron: will download"
-            read -p $'\n[Enter]'
+            read -r -p $'\n[Enter]'
             ;;
         0) exit 0 ;;
         *) sleep 1 ;;
