@@ -7,10 +7,10 @@
 *.lib
 
 # Go build artifacts
-*.mod
-*.sum
-go.mod
-go.sum
+# *.mod
+# *.sum
+# go.mod
+# go.sum
 vendor/
 
 # Go build output
