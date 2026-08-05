@@ -41,6 +41,9 @@ SANITIZED_LPORT=$(echo "$LPORT" | sed 's/[^0-9]/_/g')
 WORKDIR=$(mktemp -d)
 OUTFILE="acheron_${SANITIZED_LHOST}_${SANITIZED_LPORT}.exe"
 
+# Default path for Akagi (updated for current repo)
+AKAGI_DEFAULT_PATH="$(cd "$(dirname "$0")" && pwd)/bin/akagi.exe"
+
 # Cleanup on exit
 trap 'rm -rf "${WORKDIR:-}"' EXIT INT TERM
 
